@@ -10,3 +10,5 @@ Allowed Domains: https://international.northeastern.edu/
 Requirements
 pip install torch
 pip install transformers
+pip install faiss-cpu 
+
