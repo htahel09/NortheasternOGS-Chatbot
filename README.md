@@ -3,6 +3,7 @@ This project aims to develop an AI-powered chatbot that enables international st
 A key challenge is the website’s complex structure, making it difficult for users to find relevant information. The solution involves automated web scraping to extract and preprocess content, ensuring up-to-date responses without manual intervention. The chatbot will be deployed locally first, with plans for cloud deployment for broader accessibility.
 The project also serves as a learning opportunity for web scraping, NLP model fine-tuning, and cloud-based deployment, enhancing the technical skills of the development team
 
+<img width="723" alt="image" src="https://github.com/user-attachments/assets/245b4f6d-24d5-468e-b79b-6305773d5721" />
 Dataset:
 All URLS found by crawling: https://international.northeastern.edu/ogs/
 Allowed Domains: https://international.northeastern.edu/
