@@ -1,4 +1,4 @@
-            <img width="723" alt="image" src="https://github.com/user-attachments/assets/245b4f6d-24d5-468e-b79b-6305773d5721" />
+<img width="723" alt="image" src="https://github.com/user-attachments/assets/245b4f6d-24d5-468e-b79b-6305773d5721" />
 
 Project Description:
 This project aims to develop an AI-powered chatbot that enables international students to efficiently access information from Northeastern’s Office of Global Services website using natural language queries. By leveraging Retrieval-Augmented Generation (RAG) and Cache-Augmented Generation (CAG), the chatbot will provide accurate, context-aware responses with citations.
