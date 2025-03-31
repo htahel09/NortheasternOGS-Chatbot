@@ -1,5 +1,4 @@
 import streamlit as st
-import random
 import time
 from app.model_manager import ModelManager
 
@@ -9,21 +8,25 @@ st.title("NU OGS Chatbot")
 @st.cache_resource
 def get_model_manager():
     return ModelManager()
-
-mm = get_model_manager()
+with st.spinner("Loading OGS bot... please wait"):
+    mm = get_model_manager()
 
 # Streamed response emulator
 def response_generator(query):
     response = mm.query_handler(query)
+
+    def type_response(text):
+        for word in text.split():
+            yield word + " "
+            time.sleep(0.02)
+
     if isinstance(response, str):
-        response = response
+        yield from type_response(response)
     else:
-        response = response['output']
-    for word in response.split():
-        yield word + " "
-        time.sleep(0.02)
-    if isinstance(response, dict):
-        yield "See the following links:\n" + "\n".join(response['urls'])
+        yield from type_response(response['output'])
+        # After output, yield the URLs with HTML line breaks
+        yield "<br><br>See the following links for more:<br>" + "<br>".join(response['urls'])
+
 
 # Initialize chat history
 if "messages" not in st.session_state:
@@ -42,8 +45,16 @@ if prompt := st.chat_input("Ask anything OGS-Related"):
     with st.chat_message("User"):
         st.markdown(prompt)
 
-    # Display assistant response in chat message container
+    # Instead of st.write_stream, use a placeholder and update with markdown
     with st.chat_message("assistant"):
-        response = st.write_stream(response_generator(prompt))
+        placeholder = st.empty()
+        accumulated_text = ""
+        for token in response_generator(prompt):
+            accumulated_text += token
+            # Update the placeholder with markdown so that HTML (e.g. <br>) is rendered
+            placeholder.markdown(accumulated_text, unsafe_allow_html=True)
+            # time.sleep(0.02) is already used in type_response
+        response = accumulated_text
+
     # Add assistant response to chat history
     st.session_state.messages.append({"role": "assistant", "content": response})
