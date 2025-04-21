@@ -1,6 +1,12 @@
-# required packages, see https://pip.pypa.io/en/latest/reference/requirements-file-format/#requirements-file-format
-torch == 2.6.0+cu124
-transformers == 4.50.0.dev0
-streamlit == 1.37.1
-sentence-transformers == 3.4.1
-faiss-cpu == 1.10.0
+bert_score==0.3.13
+bleach==4.1.0
+datasets==3.3.2
+evaluate==0.4.3
+faiss_cpu==1.10.0
+numpy==2.2.5
+packaging==25.0
+scikit_learn==1.6.1
+sentence_transformers==3.4.1
+streamlit==1.44.1
+torch==2.6.0+cu124
+transformers==4.50.0.dev0

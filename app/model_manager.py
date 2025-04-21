@@ -1,103 +1,161 @@
-import torch
-from transformers import AutoTokenizer, BitsAndBytesConfig, AutoModelForCausalLM, pipeline
-from sklearn.metrics.pairwise import cosine_similarity
+import os
 import json
+import time
+import logging
 import numpy as np
+import torch
+from transformers import (
+    AutoTokenizer,
+    AutoModelForCausalLM,
+    pipeline,
+    BitsAndBytesConfig,
+)
+from sklearn.metrics.pairwise import cosine_similarity
+
 from app.cache_generator import CacheGenerator
 from app.embeddings import Embeddings
 from app.retrieval import Retrieval
 from app.rag_generator import RAGGenerator
 
+# logger
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+if not logger.handlers:
+    handler = logging.StreamHandler()
+    handler.setFormatter(
+        logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
+    )
+    logger.addHandler(handler)
+
+
 class ModelManager:
     def __init__(self, model_name="microsoft/Phi-3.5-mini-instruct"):
+        # load model
         self.model_name = model_name
-        self.load_model()
-
-        cache_file = self.load_file('all_cache_docs.json')
-        self.cache_docs = cache_file['documents']
-        self.cache_embed = np.array(cache_file['embeddings'])
-
-        self.data_embed = Embeddings('all_OGS_embedded_docs.json', import_emb=True)  # load saved embeddings
-        self.cag = CacheGenerator(self.cache_docs, self.model, self.tokenizer, self.device)
-        self.setup_pipeline()
-        self.retriever = Retrieval(self.data_embed)
-        self.rag = RAGGenerator(self.rag_pipeline)
-
-        #self.setup_pipeline()
-        print('model manager loaded successfully!')
-
-    def load_file(self, fname):
         try:
-            if fname.lower().endswith('.json'):
-                with open(fname, "r", encoding="utf-8") as f:
-                    return json.load(f)
-            else:
-                with open(fname, "r", encoding="utf-8") as file:
-                    return file.read().splitlines()
+            self._load_model()
+            self._load_cache()
+            self._init_cag()
+            self._init_rag()
+        except Exception:
+            logger.exception("Failed to initialize ModelManager")
+            raise
+
+    def _safe_load_json(self, path: str):
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                return json.load(f)
         except FileNotFoundError:
-            print(f"Error: The file '{fname}' was not found.")
+            logger.error(f"JSON file not found: {path}")
         except json.JSONDecodeError:
-            print(f"Error: The file '{fname}' is not a valid JSON file.")
-        except Exception as e:
-            print(f"An unexpected error occurred while loading '{fname}': {e}")
+            logger.error(f"Invalid JSON format in file: {path}")
+        except Exception:
+            logger.exception(f"Unexpected error loading JSON file: {path}")
         return None
 
-    def load_model(self):
-        """ load tokenizer and model using 4-bit quantization to speed up inference and reduce memor
+    def _load_model(self):
+        """ load tokenizer and model using 4-bit quantization to speed up inference and reduce memory
         """
-        quant_config = BitsAndBytesConfig(
-            load_in_4bit=True,
-            bnb_4bit_use_double_quant=True,
-            bnb_4bit_quant_type="nf4",
-            bnb_4bit_compute_dtype=torch.bfloat16
-        )
-        self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
-        self.model = AutoModelForCausalLM.from_pretrained(
-            self.model_name,
-            quantization_config=quant_config,
-            device_map='auto'
-        )
-        self.device = self.model.model.embed_tokens.weight.device
+        try:
+            quant = BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_use_double_quant=True,
+                bnb_4bit_quant_type="nf4",
+                bnb_4bit_compute_dtype=torch.bfloat16,
+            )
+            self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
+            self.model = AutoModelForCausalLM.from_pretrained(
+                self.model_name,
+                quantization_config=quant,
+                device_map="auto",
+            )
+            self.device = next(self.model.parameters()).device
+            logger.info(f"Loaded model '{self.model_name}' on {self.device}")
+        except Exception:
+            logger.exception("Error loading model or tokenizer")
+            raise
 
-    def setup_pipeline(self):
-        # Create a text-generation pipeline for RAG.
-        self.rag_pipeline = pipeline(
-            "text-generation",
-            model=self.model,
-            tokenizer=self.tokenizer,
-            device_map='auto'
-        )
+    def _load_cache(self):
+        """get cache files and setup CAG attributes
+        """
+        cache_path = os.path.join("app", "all_OGS_embedded_docs.json")
+        data = self._safe_load_json(cache_path)
+        if not data:
+            raise RuntimeError("Cache file is missing or invalid")
+        idxs = data.get("cache_idxs", [])
+        self.cache_docs = [data["documents"][i] for i in idxs]
+        self.cache_embed = np.array([data["embeddings"][i] for i in idxs])
+        self.cache_urls = [data["urls"][i] for i in idxs]
 
-    def query_handler(self, query, threshold=0.58, max_tokens=200):
-        # calculate embedding for query and reshape for cosine sim
-        query_embedding = self.data_embed.get_embedding(query)
-        query_embedding = query_embedding.reshape(1, -1)
+    def _init_cag(self):
+        """ instantiate CAG """
+        try:
+            self.cag = CacheGenerator(
+                self.cache_docs, self.model, self.tokenizer, self.device
+            )
+        except Exception:
+            logger.exception("Error initializing CacheGenerator")
+            raise
 
-        similarity = cosine_similarity(query_embedding, self.cache_embed)
-        print("Similarity scores:", similarity)
+    def _init_rag(self):
+        try:
+            # setup RAG attributes
+            self.data_embed = Embeddings("app/all_OGS_embedded_docs.json", import_emb=True)
+            self.rag_pipeline = pipeline(
+                "text-generation",
+                model=self.model,
+                tokenizer=self.tokenizer,
+                device_map="auto",
+            )
+            self.retriever = Retrieval(self.data_embed)
+            self.rag = RAGGenerator(self.rag_pipeline)
+        except Exception:
+            logger.exception("Error setting up RAG components")
+            raise
 
-        # Find indices where the similarity exceeds the threshold
-        above_threshold_indices = np.where(similarity[0] > threshold)[0]
+    def query_handler(self, query, threshold=0.57, max_tokens=150, gen_method='Greedy', temperature=0.7, top_k=50):
+        if not isinstance(query, str) or not query.strip():
+            raise ValueError("Query must be a non-empty string.")
+        start_time = time.time()
 
-        if len(above_threshold_indices) == 0:
-            print(f"No cached documents with similarity above the threshold of {threshold}.")
-        else:
-            print(f"Documents with similarity above the threshold of {threshold}:")
-            for idx in above_threshold_indices:
-                score = similarity[0][idx]
-                doc = self.cache_docs[idx]
-                print(f"Index {idx}: Similarity Score = {score}")
-                print(f"Document {idx}: {doc}\n")
+        try:
+            # calculate embedding for query and reshape for cosine sim
+            query_embedding = self.data_embed.get_embedding(query).reshape(1, -1)
 
-        if np.max(similarity) > threshold:
-            print("Use Cache Augmented Generation (CAG)")
-            response = self.cag.query_responder(query, self.tokenizer, self.model, self.device)
-        else:
-            print("Use Retrieval Augmented Generation (RAG)")
-            top_results = self.retriever.search(query, k=5)
-            output = self.rag.summarize_abstract(top_results['documents'], query)
-            response = {'output': output[1]["content"], 'urls': top_results['urls']}
-        return response
+            similarity = cosine_similarity(query_embedding, self.cache_embed)[0]
+            max_similarity = float(np.max(similarity))
+
+            if max_similarity > threshold:
+                logger.info(f"CAG path triggered (sim={max_similarity:.3f})")
+                output = self.cag.query_responder(
+                    query, self.tokenizer, self.model,
+                    max_tokens, gen_method, temperature, top_k
+                )
+                # return urls where the similarity exceeds the threshold
+                urls = [self.cache_urls[idx] for idx in np.where(similarity > threshold)[0] ]
+                method = "CAG"
+            else:
+                logger.info(f"RAG path triggered (sim={max_similarity:.3f})")
+                results = self.retriever.search(query, k=5)
+                output = self.rag.summarize_abstract(results["documents"], query)[1]["content"]
+                urls = results.get("urls", [])
+                method = "RAG"
+            print(method)
+            return {
+                "method": method,
+                "output": output,
+                "urls": urls,
+                "cache_check_time": time.time() - start_time,
+            }
+
+        except Exception as e:
+            logger.exception("Error in query_handler")
+            return {
+                "method": "ERROR",
+                "output": "An internal error occurred. Please try again later.",
+                "urls": [],
+                "cache_check_time": time.time() - start_time,
+            }
 
 
 

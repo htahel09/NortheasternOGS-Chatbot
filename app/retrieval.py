@@ -48,11 +48,11 @@ class Retrieval:
             "content": self.dataset.data[i].get("content", "No Content")
         }
         """
+        print(distances)
         results = [
             self.dataset.documents[i] for i in indices[0] if i < len(self.dataset.documents)  # Ensure index is valid
         ]
         urls = [
-            self.dataset.urls[i] for i in indices[0] if i < len(self.dataset.urls)  # Ensure index is valid
+            self.dataset.urls[i] for di, i in enumerate(indices[0]) if i < len(self.dataset.urls) and distances[0][di]<.8  # Ensure index is valid
         ]
-
-        return {'documents': results, 'urls': urls}  # Return a list if k > 1, else return a single result
+        return {'documents': results, 'urls': urls}

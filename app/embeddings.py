@@ -1,4 +1,3 @@
-# HT Work
 from sentence_transformers import SentenceTransformer
 import json
 import numpy as np
@@ -35,7 +34,6 @@ class Embeddings:
             self.data = self.load_data(data_path)  # Load dataset from JSON file
             # Compute and store embeddings as float32 for FAISS compatibility
             self.embeddings = np.array(
-                # [self.get_embedding(" ".join(map(str, item.values()))) for item in self.data], # should not just be mashing all together
                 [self.get_embedding(item['document']) for item in self.data],
                 dtype=np.float32
             )
