@@ -1,4 +1,4 @@
-<img width="723" alt="image" src="https://github.com/user-attachments/assets/245b4f6d-24d5-468e-b79b-6305773d5721" />
+<img width="500" alt="image" src="https://raw.githubusercontent.com/htahel09/NortheasternOGS-Chatbot/refs/heads/main/Hybrid_CAG_RAG.jpeg" />
 
 Project Description:
 This project aims to develop an AI-powered chatbot that enables international students to efficiently access information from Northeastern’s Office of Global Services website using natural language queries. By leveraging Retrieval-Augmented Generation (RAG) and Cache-Augmented Generation (CAG), the chatbot will provide accurate, context-aware responses with citations.
@@ -10,7 +10,16 @@ All URLS found by crawling: https://international.northeastern.edu/ogs/
 Allowed Domains: https://international.northeastern.edu/
 
 Requirements
-pip install torch
-pip install transformers
-pip install faiss-cpu 
+bert_score==0.3.13
+bleach==4.1.0
+datasets==3.3.2
+evaluate==0.4.3
+faiss_cpu==1.10.0
+numpy==2.2.5
+packaging==25.0
+scikit_learn==1.6.1
+sentence_transformers==3.4.1
+streamlit==1.44.1
+torch==2.6.0+cu124
+transformers==4.50.0.dev0
 
